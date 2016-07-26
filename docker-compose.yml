@@ -1,0 +1,16 @@
+web:
+  restart: always
+  build: .
+  expose:
+    - "8000"
+  command: /usr/local/bin/gunicorn streaming.wsgi:application -w 2 -b :8000
+
+nginx:
+  restart: always
+  build: ./nginx/
+  ports:
+    - "80:80"
+  links:
+    - web:web
+  volumes:
+    - ./nginx/conf.d:/etc/nginx/conf.d
