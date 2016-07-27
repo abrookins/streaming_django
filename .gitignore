@@ -91,6 +91,3 @@ ENV/
 .ropeproject
 
 .gitignore
-download/
-manage.py
-streaming/
