@@ -6,7 +6,37 @@ This repository exists to explain just what goes on when you use Django's
 I will discuss what happens in your Django application, what happens at the
 Python Web Server Gateway Interface (WSGI) layer, and look at some examples.
 
-## What even is a `StreamingHttpResponse`?
+## How to use this repository
+
+Just read this document (README.md). If you want to experiment with running
+`curl` requests against a streaming vs. non-streaming Django view, install the
+code:
+
+### Running the `streaming_django` project
+
+First, [install docker](https://www.docker.com/), including `docker-compose`,
+and get a machine started.
+
+Then:
+
+	$ git clone git@github.com:abrookins/streaming_django.git
+	$ cd streaming_django
+	$ docker-compose build
+	$ docker-compose up
+
+Now you're ready to make a request:
+
+	$ curl -vv --raw "http://192.168.99.100/download_csv_streaming"
+
+Or:
+
+	$ curl -vv --raw "http://192.168.99.100/download_csv" 
+
+*Pro tip*: The `--raw` flag is important if you want to see that a response is
+actually streaming. Without it, you won't see a difference between a streaming
+and non-streaming response.
+
+## So, what even is a `StreamingHttpResponse`?
 
 Most Django responses are `HttpResponse`s. At a high level, this means that the
 body of the response is built in memory and sent to the HTTP client in a single
@@ -142,7 +172,7 @@ First, some conditions must be true:
 
 If these conditions are true, then Gunicorn will add a `Transfer-Encoding:
 chunked` header to the response, signaling to the client that the response will
-stream in chunks. 
+stream in chunks.
 
 In fact, Gunicorn will respond with `Transfer-Encoding: chunked` even if you
 used an `HttpResponse`, if those conditions are true!
