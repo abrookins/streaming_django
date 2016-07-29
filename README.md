@@ -1,23 +1,25 @@
 # How does Django's `StreamingHttpResponse` work, exactly?
 
 This repository exists to explain just what goes on when you use Django's
-`StreamingHttpResponse`, when you might consider using it, and some pitfalls.
+`StreamingHttpResponse`.
 
 I will discuss what happens in your Django application, what happens at the
 Python Web Server Gateway Interface (WSGI) layer, and look at some examples.
 
 ## How to use this repository
 
-Just read this document (README.md). If you want to experiment with running
-`curl` requests against a streaming vs. non-streaming Django view, install the
-code:
+Just read this document (README.md).
+
+If you want to experiment with running `curl` requests against a streaming vs.
+non-streaming Django view, follow the next section, "Running the
+`streaming_django` project," to install the included example Django project.
 
 ### Running the `streaming_django` project
 
 First, [install docker](https://www.docker.com/), including `docker-compose`,
-and get a machine started.
+and then get a machine started.
 
-Then:
+When you have a Docker machine running, do the following:
 
 	$ git clone git@github.com:abrookins/streaming_django.git
 	$ cd streaming_django
@@ -32,17 +34,17 @@ Or:
 
 	$ curl -vv --raw "http://192.168.99.100/download_csv" 
 
-*Pro tip*: The `--raw` flag is important if you want to see that a response is
-actually streaming. Without it, you won't see a difference between a streaming
-and non-streaming response.
+**Pro tip**: The `--raw` flag is important if you want to see that a response
+is actually streaming. Without it, you won't see much difference between a
+streaming and non-streaming response.
 
 ## So, what even is a `StreamingHttpResponse`?
 
-Most Django responses are `HttpResponse`s. At a high level, this means that the
+Most Django responses use `HttpResponse`. At a high level, this means that the
 body of the response is built in memory and sent to the HTTP client in a single
 piece.
 
-Here's a short example of using an `HttpResponse`:
+Here's a short example of using `HttpResponse`:
 
 ```python
     def my_view(request):
@@ -56,7 +58,7 @@ Here's a short example of using an `HttpResponse`:
 A `StreamingHttpResponse`, on the other hand, is a response whose body is sent
 to the client in multiple pieces, or "chunks."
 
-Here's a short example of using a `StreamingHttpResponse`:
+Here's a short example of using `StreamingHttpResponse`:
 
 ```python
     def hello():
@@ -69,13 +71,16 @@ Here's a short example of using a `StreamingHttpResponse`:
 ```
 
 You can read more about how to use these two classes in [Django's
-documentation](https://docs.djangoproject.com/en/1.9/ref/request-response/#streaminghttpresponse-objects).
+documentation](https://docs.djangoproject.com/en/1.9/ref/request-response/).
 The interesting part is what happens next -- *after* you return the response.
 
 ## When would you use a `StreamingHttpResponse`?
 
-One of the best use cases for `StreamingHttpResponse` is sending large files,
-e.g. a large CSV file.
+But before we talk about what happens *after* you return the response, let us
+digress for a moment: why would you even use a `StreamingHttpResponse`?
+
+One of the best use cases for streaming responses is to send large files, e.g.
+a large CSV file.
 
 With an `HttpResponse`, you would typically load the entire file into memory
 (produced dynamically or not) and then send it to the client. For a large file,
@@ -87,23 +92,29 @@ produce parts of the file dynamically, and begin sending these parts to the
 client immediately. **Crucially,** there is no need to load the entire file
 into memory.
 
-## WSGI
+## A quick note about WSGI
 
-We're about to start talking about [Python Web Server Gateway Interface (WSGI)
-specification](https://www.python.org/dev/peps/pep-3333/). If you aren't
-familiar with WSGI, it proposes rules that web frameworks and web servers
-should follow in order that you, the framework user, can swap out one WSGI
-server (like uWSGI) for another (Gunicorn) and expect your Python web
-application to continue to function.
+Now we're approaching the part of our journey that lies just beyond most Django
+developers' everyday experience of working with Django's response classes.
+
+Yes, we're about to discuss the [Python Web Server Gateway Interface (WSGI)
+specification](https://www.python.org/dev/peps/pep-3333/).
+
+So, a quick note if you aren't familiar with WSGI. WSGI is a specification that
+proposes rules that web frameworks and web servers should follow in order that
+you, the framework user, can swap out one WSGI server (like uWSGI) for another
+(Gunicorn) and expect your Python web application to continue to function.
 
 ## Django and WSGI
 
+And now, back to our journey into deeper knowledge!
+
 So, what happens after your Django view returns a `StreamingHttpResponse`? In
 most Python web applications, the response is passed off to a WSGI server like
-uWSGI or Gunicorn (Green Unicorn).
+uWSGI or Gunicorn (AKA, Green Unicorn).
 
-Django ensures that `StreamingHttpResponse` conforms to the WSGI spec, which
-states this:
+As with `HttpResponse`, Django ensures that `StreamingHttpResponse` conforms to
+the WSGI spec, which states this:
 
 > When called by the server, the application object must return an iterable
 > yielding zero or more bytestrings. This can be accomplished in a variety of
@@ -111,7 +122,8 @@ states this:
 > generator function that yields bytestrings, or by the application being a class
 > whose instances are iterable.
 
-Here's how `StreamingHttpResponse` satisfies these requirements (full source):
+Here's how `StreamingHttpResponse` satisfies these requirements ([full
+source](https://docs.djangoproject.com/en/1.9/_modules/django/http/response/#StreamingHttpResponse)):
 
 ```python
     @property
@@ -126,7 +138,7 @@ Here's how `StreamingHttpResponse` satisfies these requirements (full source):
 You give the class a generator and it coerces the values that it produces into
 bytestrings.
 
-Compare that with the approach in `HttpResponse`:
+Compare that with the approach in `HttpResponse` ([full source](https://docs.djangoproject.com/en/1.9/_modules/django/http/response/#HttpResponse)):
 
 ```python
     @content.setter
@@ -166,8 +178,8 @@ streaming response actually "stream"?
 First, some conditions must be true:
 
 * The client must be speaking HTTP/1.1 or newer
-* The response does not include a Content-Length header
 * The request method wasn't a HEAD
+* The response does not include a Content-Length header
 * The response status wasn't 204 or 304
 
 If these conditions are true, then Gunicorn will add a `Transfer-Encoding:
@@ -224,4 +236,8 @@ Hello,world,99
 * Connection #0 to host 192.168.99.100 left intact
 ```
 
-Voila! We did it: a "streaming" response from Django.
+So there you have it. We journeyed from considering when to use
+`StreamingHttpResponse` over `HttpResponse`, to an example of using the class
+in your Django project, then into the dungeons of WSGI and WSGI servers, and
+finally to the client's experience. And we managed to stream a response -- go
+us!
