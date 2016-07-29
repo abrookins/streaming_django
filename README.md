@@ -153,11 +153,15 @@ multiple items.
 
 ### What does the client get?
 
-If all goes well, the client should see a response like this:
+If the streaming response worked, the client should get an HTTP 1.1 response
+with the `Transfer-Encoding: chunked` header, and instead of a single piece of
+content with a `Content-Length`, the client should see each bytestring that
+your generator/iterator yielded, sent with the length of that chunk.
+
+Here is an example that uses the code in this repository:
 
 ```
-~/src/streaming_django master
-(streaming_django) ❯ curl -vv "http://192.168.99.100/download_csv_streaming"                                                                   [NORMAL]
+(streaming_django) ❯ curl -vv --raw "http://192.168.99.100/download_csv_streaming"
 *   Trying 192.168.99.100...
 * Connected to 192.168.99.100 (192.168.99.100) port 80 (#0)
 > GET /download_csv_streaming HTTP/1.1
@@ -167,31 +171,27 @@ If all goes well, the client should see a response like this:
 >
 < HTTP/1.1 200 OK
 < Server: nginx/1.11.1
-< Date: Thu, 28 Jul 2016 04:09:02 GMT
+< Date: Fri, 29 Jul 2016 14:27:58 GMT
 < Content-Type: text/csv
 < Transfer-Encoding: chunked
 < Connection: keep-alive
 < X-Frame-Options: SAMEORIGIN
 < Content-Disposition: attachment; filename=big.csv
 <
+f
 One,Two,Three
+
+f
 Hello,world,1
-Hello,world,2
-Hello,world,3
-Hello,world,4
-Hello,world,5
-Hello,world,6
-Hello,world,7
-Hello,world,8
-Hello,world,9
-Hello,world,10
+
 ...
-Hello,world,999
+
+10
+Hello,world,99
+
+0
+
 * Connection #0 to host 192.168.99.100 left intact
 ```
 
-Note the `Transfer-Encoding` header set to "chunked" and *no* `Content-Length`
-header.  This should cause any client supporting HTTP 1.1 to use the [chunked
-transfer encoding
-mechanism](https://en.wikipedia.org/wiki/Chunked_transfer_encoding) to receive
-the response data.
+Voila! We did it: a "streaming" response from Django.

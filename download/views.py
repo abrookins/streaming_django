@@ -37,7 +37,7 @@ def download_csv_streaming(request):
     This view responds with a generator that yields each row of the response as
     it's created.
     """
-    response = StreamingHttpResponse(big_csv(1000), content_type='text/csv')
+    response = StreamingHttpResponse(big_csv(100), content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename=big.csv'
 
     return response
